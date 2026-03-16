@@ -614,9 +614,9 @@ function quitGame() {
    ================================================================ */
 function setupPhase(index) {
     currentPhaseIndex = index;
-    if      (index === 0) activePool = shuffleArray([...easyPool]).slice(0, 1);
-    else if (index === 1) activePool = shuffleArray([...mediumPool]).slice(0, 1);
-    else if (index === 2) activePool = shuffleArray([...hardPool]).slice(0, 1);
+    if      (index === 0) activePool = shuffleArray([...easyPool]);
+    else if (index === 1) activePool = shuffleArray([...mediumPool]);
+    else if (index === 2) activePool = shuffleArray([...hardPool]);
     else activePool = [allQuestions[Math.floor(Math.random() * allQuestions.length)]];
     loadQuestion();
 }
