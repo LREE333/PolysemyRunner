@@ -361,7 +361,7 @@
 <!-- ── 加载进度条屏幕 (Asset Manager) ── -->
 <div id="loading-screen" class="full-screen-menu">
     <h2 style="color: var(--pixel-yellow);">ASSET MANAGER</h2>
-    <div class="loading-text" id="loading-text">Loading 资源中... 0%</div>
+    <div class="loading-text" id="loading-text">Loading resources... 0%</div>
     <div class="loading-bar-container">
         <div id="loading-bar"></div>
     </div>
@@ -576,7 +576,7 @@ function handleAssetLoaded() {
     loadedAssetsCount++;
     const percent = Math.floor((loadedAssetsCount / gameAssets.length) * 100);
     
-    document.getElementById('loading-text').innerText = `Loading 资源中... ${percent}%`;
+    document.getElementById('loading-text').innerText = `Loading resources... ${percent}%`;
     document.getElementById('loading-bar').style.width = `${percent}%`;
 
     if (loadedAssetsCount === gameAssets.length) {
