@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polysemy Runner: Spaced Repetition Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* ============================================
+           ROOT & BODY
+           ============================================ */
+        :root {
+            --sprite-width: 96px;
+            --pixel-green:  #38ef7d;
+            --pixel-red:    #ff0044;
+            --pixel-yellow: #ffb347;
+            --pixel-purple: #9d00ff;
+            --pixel-blue:   #00d2ff;
+            --pixel-bg:     #111;
+            --font-main:    'Press Start 2P', cursive;
+            --theme-color:  var(--pixel-green);
+            --bg-aspect-ratio: 1.7916;
+        }
+        body {
+            margin: 0; overflow: hidden;
+            background-color: var(--pixel-bg);
+            color: white; font-family: var(--font-main);
+            user-select: none; transition: background-color 1s;
+        }
+
+        /* ============================================
+           GAME CONTAINER & BACKGROUND
+           ============================================ */
+        #game-container {
+            width: 100vw; height: 100vh; position: relative;
+            background-size: auto 100%; background-repeat: repeat-x;
+            background-position: 0 0; display: none;
+            image-rendering: pixelated;
+        }
+        .scrolling { animation: scrollBg 20s linear infinite; }
+        @keyframes scrollBg {
+            from { background-position: 0 0; }
+            to   { background-position: calc(-100vh * var(--bg-aspect-ratio)) 0; }
+        }
+        .paused-anim { animation-play-state: paused !important; }
+        #bg-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 0; transition: background 1s;
+        }
+
+        /* ============================================
+           MENUS & SCREENS
+           ============================================ */
+        .full-screen-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100; gap: 30px; background: #111; text-align: center;
+        }
+
+        /* 初始点击屏幕（用于解锁音频播放） */
+        #init-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: white; display: flex;
+            justify-content: center; align-items: center; z-index: 9999;
+            cursor: pointer; font-family: var(--font-main);
+            animation: pulseText 2s infinite;
+        }
+        @keyframes pulseText {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* 修改后的 Start Screen（使用图片作为背景） */
+        #start-screen {
+            display: none; 
+            background-image: url('assets/cover.png'); 
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: block; 
+        }
+
+        /* 透明的 START QUEST 点击区域 - 调整了位置和大小 */
+        #start-quest-hitbox {
+            position: absolute;
+            bottom: 5%; /* 之前是8%，导致框偏上，现在调低到5% */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 230px;  /* 稍微加宽一点以覆盖文字 */
+            height: 55px;  
+            background: rgba(0, 0, 0, 0); 
+            cursor: pointer;
+            border: 2px solid transparent;
+            outline: none;
+            transition: 0.2s;
+        }
+        #start-quest-hitbox:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Intermission Screen with Campfire Background */
+        #intermission-screen {
+            display: none; background: #000; z-index: 200; overflow: hidden;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        }
+        #intermission-screen::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('assets/fire_relax.png'); 
+            background-size: cover; background-position: center; background-repeat: no-repeat; z-index: 0;
+        }
+
+        #campfire-knight {
+            position: absolute;
+            left: 35%;
+            bottom: 40%;
+            width: 96px;
+            height: 64px;
+            background-image: url('assets/character/run.png');
+            background-position: 0px 0px;
+            background-repeat: no-repeat;
+            z-index: 10;
+            image-rendering: pixelated;
+            animation: campfireKnightBreathe 3s ease-in-out infinite;
+        }
+        @keyframes campfireKnightBreathe {
+            0%, 100% { transform: scale(5) translateZ(0) translateY(0); }
+            50% { transform: scale(5) translateZ(0) translateY(-2px) scaleY(1.02); }
+        }
+
+        @keyframes slideDown {
+            0% { transform: translate(-50%, -100vh); opacity: 0; }
+            100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+        
+        .intermission-box {
+            position: absolute; top: 10%; left: 50%; width: 80%; max-width: 600px;
+            background: rgba(0, 0, 0, 0.85); border: 2px solid #4ade80; border-radius: 8px;
+            padding: 20px; text-align: center; box-shadow: 0 0 15px rgba(74, 222, 128, 0.3);
+            z-index: 30; animation: slideDown 1.5s ease-out forwards;
+        }
+
+        #pause-screen { display: none; background: rgba(10,10,20,0.95); z-index: 200; padding: 20px; }
+        
+        h1 { color: var(--pixel-green); text-shadow: 4px 4px 0px #005500; font-size: 2.5rem; line-height: 1.5; }
+        h2 { color: var(--pixel-yellow); }
+        .pixel-btn {
+            background: #222; color: white; border: 4px solid white;
+            padding: 15px 20px; font-family: var(--font-main); font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+            box-shadow: 4px 4px 0px rgba(255,255,255,0.3); margin-top: 10px;
+        }
+        .pixel-btn:hover { background: white; color: black; transform: translate(-2px,-2px); box-shadow: 6px 6px 0px var(--theme-color); }
+        .top-controls { display: flex; gap: 15px; align-items: center; }
+        .small-btn { padding: 8px 12px; font-size: 0.8rem; border: 2px solid white; }
+        .review-list {
+            box-sizing: border-box;
+            max-height: 30vh; overflow-y: auto; width: 100%;
+            background: #000; border: 2px dashed #555; padding: 15px;
+            text-align: left; font-size: 0.8rem; line-height: 1.8; margin-top: 10px;
+        }
+        .review-item { border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px; }
+        .review-word { color: var(--pixel-red); font-size: 1.2rem; }
+
+        /* ============================================
+           IN-GAME UI & OTHERS
+           ============================================ */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; padding: 20px; display: flex; justify-content: space-between; align-items: flex-start; box-sizing: border-box; font-size: 1.2rem; z-index: 10; text-shadow: 2px 2px 0 #000; }
+        .heart-icon { display: inline-block; width: 64px; height: 64px; background-image: url('assets/heart.png'); background-size: contain; background-repeat: no-repeat; margin: 0; vertical-align: middle; image-rendering: pixelated; }
+        .heart-empty { filter: grayscale(1) opacity(0.3); }
+        #context-box { position: absolute; top: 160px; left: 50%; transform: translateX(-50%); width: 80%; text-align: center; background: rgba(0,0,0,0.85); border: 4px solid var(--theme-color); padding: 20px; font-size: 1.1rem; line-height: 1.8; z-index: 10; box-shadow: 0 0 20px rgba(0,0,0,0.5); transition: border-color 1s; }
+        .blank-space { color: var(--theme-color); border-bottom: 3px dashed var(--theme-color); padding: 0 20px; transition: color 1s, border-color 1s; }
+        #timer-bar-container { position: absolute; top: 110px; left: 10%; width: 80%; height: 10px; background: #222; border: 2px solid #555; z-index: 10; }
+        #timer-bar { width: 100%; height: 100%; background-color: var(--theme-color); }
+        #runner-area { position: absolute; bottom: 150px; width: 100%; height: 300px; border-bottom: 4px solid #555; z-index: 5; }
+        #options-deck { position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 20; }
+        .gate { background: #222; border: 4px solid #777; color: white; font-family: var(--font-main); font-size: 1rem; padding: 15px 30px; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #000; transition: all 0.2s; min-width: 150px; }
+        .gate:hover { border-color: var(--theme-color); transform: translateY(-5px); }
+        .gate.correct { background: #FFD700 !important; color: #000 !important; border-color: #FFF !important; box-shadow: 0 0 40px #FFD700, inset 0 0 10px #FFF !important; transform: scale(1.1); }
+
+        #player { position: absolute; left: 10%; bottom: 0; width: var(--sprite-width); overflow: visible; height: 64px; background-repeat: no-repeat; z-index: 6; image-rendering: pixelated; will-change: transform, background-position; transform: scale(6) translateZ(0); transform-origin: bottom center; }
+        #approaching-threat { position: absolute; left: 100vw; bottom: 10px; width: 80px; height: 64px; background-repeat: no-repeat; z-index: 5; filter: drop-shadow(-5px 5px 0px rgba(0,0,0,0.8)); transform-origin: bottom center; image-rendering: pixelated; }
+        .sprite-anim { animation: play-sprite 0.8s steps(var(--frames)) infinite; }
+        @keyframes play-sprite { from { background-position: 0px 0px; } to { background-position: calc(var(--frames) * var(--sprite-width) * -1) 0px; } }
+        .state-run    { background-image: url('assets/character/run.png'); --frames: 8; }
+        .state-attack { background-image: url('assets/character/attack.png'); --frames: 6; }
+        .state-hurt   { background-image: url('assets/character/hurt.png'); --frames: 4; filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(5) drop-shadow(5px 5px 0px rgba(0,0,0,0.8)) !important; }
+        .state-dash   { background-image: url('assets/character/run.png'); --frames: 8; }
+
+        #blood-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.4); opacity: 0; pointer-events: none; z-index: 999; transition: opacity 0.2s; }
+        .shake { animation: screenShake 0.4s; }
+        @keyframes screenShake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-10px,10px); } 40% { transform: translate(10px,-10px); } 60% { transform: translate(-10px,-10px); } }
+        .floating-buff { position: absolute; font-size: 0.9rem; color: var(--pixel-yellow); text-shadow: 2px 2px 0 #000; z-index: 50; pointer-events: none; animation: floatUp 1.6s ease-out forwards; white-space: nowrap; }
+        @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 50% { transform: translateY(-44px) scale(1.2); opacity: 1; } 100% { transform: translateY(-70px) scale(0.9); opacity: 0; } }
+
+        /* CODEX MODAL & OTHERS */
+        #codex-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.93); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .codex-content { background: #111; border: 4px solid var(--theme-color); width: 92%; max-width: 640px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(0,0,0,0.9); }
+        .codex-header { flex-shrink: 0; text-align: center; padding: 22px 30px 8px; border-bottom: 2px solid #222; }
+        .codex-header h2 { margin: 0 0 6px; font-size: 1rem; }
+        .codex-header h1 { margin: 0; font-size: 1.7rem; }
+        .codex-body { flex: 1; overflow-y: auto; padding: 10px 25px 6px; }
+        .codex-footer { flex-shrink: 0; padding: 10px 30px 18px; text-align: center; border-top: 2px solid #222; background: #0e0e0e; }
+        .codex-footer .pixel-btn { margin-top: 0; }
+        .meaning { margin: 10px 0; padding: 10px 14px; border: 2px dashed #555; font-size: 0.8rem; line-height: 1.6; }
+        .core   { color: #aaa; }
+        .hidden { color: var(--pixel-green); }
+
+        #codex-context-replay { display: none; margin-top: 10px; padding: 10px 14px; background: rgba(56,239,125,0.07); border: 2px dashed #3a8a60; font-size: 0.7rem; line-height: 1.9; color: #b0e8c8; }
+        .replay-highlight { color: var(--pixel-green); font-weight: bold; border-bottom: 2px solid var(--pixel-green); padding: 0 2px; }
+        #codex-distractor-explanation { display: none; margin-top: 10px; padding: 10px 14px; background: rgba(255,0,68,0.1); border: 2px dashed #ff4466; font-size: 0.7rem; line-height: 1.8; color: #ffaaaa; }
+        #codex-memory-tip { display: none; margin-top: 10px; padding: 10px 14px; background: rgba(255,179,71,0.08); border-left: 4px solid var(--pixel-yellow); font-size: 0.65rem; line-height: 1.9; color: #f5d080; }
+        #codex-recall-section { display: none; margin-top: 12px; padding: 14px; background: rgba(255,0,68,0.07); border: 2px solid #ff4466; }
+        .recall-label { display: block; color: #ff8899; font-size: 0.58rem; line-height: 1.9; margin-bottom: 10px; }
+        #recall-input { display: block; margin: 8px auto 6px; background: #000; border: 3px solid #555; color: white; font-family: var(--font-main); font-size: 0.8rem; padding: 10px 14px; width: 200px; text-align: center; }
+        #recall-input:focus { outline: none; border-color: var(--pixel-yellow); }
+        #recall-input.recall-correct { border-color: var(--pixel-green); color: var(--pixel-green); }
+        #recall-input.recall-wrong { animation: recallShake 0.35s; border-color: var(--pixel-red); }
+        @keyframes recallShake { 0%,100% { transform: translateX(0); } 25%,75% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }
+        #recall-feedback { font-size: 0.58rem; color: #888; min-height: 18px; margin-top: 6px; }
+        .recall-submit-btn { background: #1a1a1a; border: 2px solid var(--pixel-yellow); color: var(--pixel-yellow); font-family: var(--font-main); font-size: 0.58rem; padding: 9px 18px; cursor: pointer; margin-top: 10px; display: inline-block; }
+        .recall-submit-btn:hover { background: var(--pixel-yellow); color: #000; }
+
+        /* PIXEL LIGHTBULB HINT BUTTON */
+        #hint-btn { position: fixed !important; bottom: 20px !important; right: 24px !important; z-index: 25; display: none; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; padding: 12px 14px; background: rgba(0,0,0,0.82); border: 3px solid #555; transition: border-color 0.2s, background 0.2s; }
+        #hint-btn:hover { border-color: var(--pixel-yellow); background: rgba(30,24,0,0.9); }
+        #hint-btn:hover .hint-rays { opacity: 1; }
+        #hint-btn.hint-used { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+        .hint-bulb-wrap { position: relative; width: 40px; height: 48px; }
+        .hint-rays { position: absolute; top: 12px; left: 20px; width: 0; height: 0; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+        .hint-ray { position: absolute; width: 10px; height: 2px; background: #ffe87a; image-rendering: pixelated; transform-origin: left center; }
+        .hint-label { font-family: var(--font-main); font-size: 0.5rem; color: var(--pixel-yellow); text-align: center; line-height: 1.7; }
+
+        /* TREASURE CHEST */
+        .chest-wrapper { position: absolute; bottom: 60px; left: 22%; z-index: 40; display: flex; flex-direction: column; align-items: center; transform-origin: bottom center; animation: chestBounceIn 0.45s steps(4) forwards; }
+        @keyframes chestBounceIn { 0% { transform: translateY(28px) scale(0.3); opacity: 0; } 55% { transform: translateY(-8px) scale(1.12); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+        .chest-aura { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(255,200,0,0.55) 0%, rgba(255,200,0,0.15) 50%, transparent 70%); animation: auraBreath 0.6s ease-in-out infinite alternate; pointer-events: none; }
+        @keyframes auraBreath { from { transform: translate(-50%,-50%) scale(0.75); } to { transform: translate(-50%,-50%) scale(1.3); } }
+        .chest-pixel { position: relative; width: 52px; image-rendering: pixelated; z-index: 2; }
+        .chest-lid { width: 52px; height: 20px; background: #9b5a1a; border: 3px solid #5c2e08; border-bottom: 2px solid #7a3d0f; position: relative; transform-origin: bottom center; transition: transform 0.4s steps(4); box-shadow: inset 0 4px 0 rgba(255,200,100,0.25); }
+        .chest-lid::before { content: ''; position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 38px; height: 8px; background: #b36c22; }
+        .chest-lid.lid-open { transform: perspective(200px) rotateX(-145deg); }
+        .chest-body { width: 52px; height: 30px; background: #7a3b10; border: 3px solid #5c2e08; border-top: none; position: relative; box-shadow: inset 0 -4px 0 rgba(0,0,0,0.35); }
+        .chest-body::before { content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: #FFD700; border: 3px solid #8B6914; box-shadow: inset 0 0 0 3px rgba(255,255,255,0.2); }
+        .chest-body::after { content: ''; position: absolute; top: 12px; left: 6px; width: 4px; height: 4px; background: #c8a050; box-shadow: 32px 0 0 #c8a050; }
+        .chest-item-out { position: absolute; font-size: 1.8rem; top: -8px; left: 50%; transform: translateX(-50%); animation: itemFlyOut 1.1s ease-out forwards; pointer-events: none; z-index: 5; }
+        @keyframes itemFlyOut { 0% { transform: translateX(-50%) translateY(0) scale(0.4) rotate(0deg); opacity: 1; } 45% { transform: translateX(-50%) translateY(-52px) scale(1.5) rotate(14deg); opacity: 1; } 100% { transform: translateX(-50%) translateY(-90px) scale(0.6) rotate(-6deg); opacity: 0; } }
+        .chest-sparkle { position: absolute; image-rendering: pixelated; pointer-events: none; animation: sparkleOut 0.75s ease-out forwards; }
+        @keyframes sparkleOut { 100% { opacity: 0; transform: scale(0); } }
+
+        /* SUMMIT SCREEN */
+        #summit-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; justify-content: center; align-items: center; overflow: hidden; z-index: 250; background: #000; }
+        #summit-screen::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('assets/summit_image.png'); background-size: cover; background-position: center; background-repeat: no-repeat; z-index: 0; }
+        .campfire-glow { position: absolute; bottom: 10%; left: 65%; width: 300px; height: 300px; transform: translate(-50%, 50%); background: radial-gradient(circle, rgba(255, 140, 0, 0.4) 0%, rgba(255, 69, 0, 0.1) 40%, transparent 70%); z-index: 2; pointer-events: none; animation: fireFlicker 2s infinite alternate; mix-blend-mode: screen; }
+        @keyframes fireFlicker { 0%, 100% { opacity: 1; transform: translate(-50%, 50%) scale(1); } 25% { opacity: 0.8; transform: translate(-50%, 50%) scale(1.05); } 50% { opacity: 0.9; transform: translate(-50%, 50%) scale(0.95); } 75% { opacity: 0.7; transform: translate(-50%, 50%) scale(1.1); } }
+        @keyframes breathe { 0%, 100% { transform: scale(5) translateZ(0) translateY(0); } 50% { transform: scale(5) translateZ(0) translateY(-2px) scaleY(1.02); } }
+        .warrior-breathe { animation: breathe 3s ease-in-out infinite; }
+
+        #summit-dialogue-wrapper { position: absolute; bottom: 0; left: 0; width: 100%; z-index: 30; transform: translateY(105%); transition: transform 0.55s steps(6); }
+        #summit-dialogue-wrapper.dlg-visible { transform: translateY(0); }
+        #summit-dialogue-box { margin: 0 auto; width: 94%; max-width: 1040px; background: #110c04; border-top: 5px solid #d4a847; border-left: 4px solid #c49030; border-right: 4px solid #c49030; box-shadow: inset 0 2px 0 rgba(255,220,100,0.15); }
+        #dev-portrait-area { display: flex; align-items: stretch; min-height: 110px; }
+        #dev-portrait .chloe-portrait-img { width: 80px; height: 80px; background-image: url('assets/chloe_portrait.png'); background-size: 200% auto; background-position: 0 0; image-rendering: pixelated; border-radius: 4px; }
+        #dev-name-label { color: #d4a847; font-size: 0.5rem; font-family: var(--font-main); text-align: center; line-height: 1.5; margin-top: 4px; }
+        #dialogue-text-area { flex: 1; padding: 14px 22px 14px 18px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        #dev-name-tag { background: #d4a847; color: #110c04; display: inline-block; padding: 3px 10px; font-size: 0.55rem; font-family: var(--font-main); margin-bottom: 8px; flex-shrink: 0; }
+        #dialogue-text { font-family: var(--font-main); font-size: 0.68rem; line-height: 2.2; color: #f0e8d0; word-spacing: 8px; letter-spacing: 0.04em; word-break: break-word; overflow-wrap: break-word; white-space: normal; min-height: 44px; cursor: pointer; }
+        #dialogue-continue-btn { align-self: flex-end; margin-top: 6px; flex-shrink: 0; background: none; border: none; color: #d4a847; font-family: var(--font-main); font-size: 0.58rem; cursor: pointer; padding: 2px 8px; display: none; animation: blinkContinue 0.7s steps(2) infinite; }
+        @keyframes blinkContinue { 50% { opacity: 0; } }
+        .summit-star { position: absolute; background: white; border-radius: 50%; animation: twinkle linear infinite; z-index: 1; }
+        @keyframes twinkle { 0%, 100% { opacity: 0.1; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 4px #fff; } }
+    </style>
+</head>
+<body>
+<script src="data.js"></script>
+
+<!-- ── 音频初始化屏幕 ── -->
+<div id="init-screen" onclick="initGameAudio()">
+    <p>Click anywhere to start</p>
+</div>
+
+<!-- ── Start Screen (封面图) ── -->
+<div id="start-screen" class="full-screen-menu">
+    <!-- 透明的点击区域，覆盖在图片中的 START QUEST 按钮上 -->
+    <button id="start-quest-hitbox" onclick="startGame()"></button>
+</div>
+
+<!-- ── Pause Screen ── -->
+<div id="pause-screen" class="full-screen-menu">
+    <h1>PAUSED</h1>
+    <p>Take a breath. The monsters are waiting.</p>
+    <button class="pixel-btn" onclick="togglePause()">RESUME RUN</button>
+    <button class="pixel-btn" style="border-color:var(--pixel-red);" onclick="quitGame()">QUIT TO LOG</button>
+</div>
+
+<!-- ── Intermission Screen (Campfire Rest) ── -->
+<div id="intermission-screen" class="screen hidden">
+    <div id="campfire-knight"></div>
+    <div class="intermission-box">
+        <h1 id="intermission-title" class="text-green">REGION CLEARED</h1>
+        <p class="hp-restore" style="color:var(--pixel-green);">Campfire Rest: HP +2 ❤️</p>
+        <p>Review your stubborn errors before moving on:</p>
+        <div id="review-list" class="review-list"></div>
+        <button id="intermission-next-btn" class="pixel-btn">Enter Next Region</button>
+    </div>
+</div>
+
+<!-- ── Game Over Screen ── -->
+<div id="game-over-screen" class="full-screen-menu" style="display:none;z-index:300;background:rgba(20,0,0,0.95);">
+    <h1 style="color:var(--pixel-red)">GAME OVER</h1>
+    <p id="game-over-msg">You crashed into the wall of misunderstanding.</p>
+    <p style="color:var(--pixel-yellow);margin-top:20px;">--- FATAL ERRORS LOG ---</p>
+    <div id="game-over-review-list" class="review-list"></div>
+    <button class="pixel-btn" onclick="location.reload()">Restart Journey</button>
+</div>
+
+<!-- ── SUMMIT SCREEN ── -->
+<div id="summit-screen" class="full-screen-menu" style="display: none;">
+    <div id="summit-stars" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;"></div>
+    <div class="campfire-glow"></div>
+    <div id="summit-warrior" style="position:absolute; z-index:10; image-rendering:pixelated;"></div>
+
+    <div id="summit-dialogue-wrapper">
+        <div id="summit-dialogue-box">
+            <div id="dev-portrait-area">
+                <div id="dev-portrait">
+                    <div class="chloe-portrait-img"></div>
+                    <div id="dev-name-label">CHLOE</div>
+                </div>
+                <div id="dialogue-text-area">
+                    <div id="dev-name-tag">Chloe</div>
+                    <div id="dialogue-text" onclick="advanceSummitDialogue()"></div>
+                    <button id="dialogue-continue-btn" onclick="advanceSummitDialogue()">▼</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="blood-overlay"></div>
+
+<div id="game-container">
+    <div id="bg-overlay"></div>
+    <div id="ui-layer">
+        <div>HP: <span id="hearts"></span></div>
+        <div style="display:flex;align-items:center;gap:20px;">
+            <div id="level-display">Phase: <span id="phase-name">EASY</span> | Left: <span id="pool-count">50</span></div>
+            <div class="top-controls" id="top-controls">
+                <button class="pixel-btn small-btn" style="margin:0;" onclick="togglePause()">PAUSE</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="timer-bar-container"><div id="timer-bar"></div></div>
+    
+    <div id="context-box">
+        <span id="sentence-part-1">Loading...</span>
+        <span class="blank-space" id="blank-zone">????</span>
+        <span id="sentence-part-2"></span>
+    </div>
+
+    <div id="hint-btn" onclick="showHint()">
+        <div class="hint-bulb-wrap">
+            <svg id="hint-bulb-svg" width="40" height="48" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated; display:block;">
+                <rect class="bulb-g" x="12" y="0"  width="16" height="4"  fill="#ffe87a"/>
+                <rect class="bulb-g" x="8"  y="4"  width="24" height="4"  fill="#ffe87a"/>
+                <rect class="bulb-g" x="4"  y="8"  width="32" height="4"  fill="#ffe87a"/>
+                <rect class="bulb-g" x="4"  y="12" width="32" height="4"  fill="#ffe87a"/>
+                <rect class="bulb-g" x="4"  y="16" width="32" height="4"  fill="#ffe87a"/>
+                <rect class="bulb-g" x="8"  y="20" width="24" height="4"  fill="#ffe87a"/>
+                <rect x="8"  y="4"  width="6" height="10" fill="rgba(255,255,255,0.55)"/>
+                <rect x="16" y="14" width="8" height="2"  fill="rgba(200,160,0,0.6)"/>
+                <rect x="17" y="10" width="6" height="2"  fill="rgba(200,160,0,0.4)"/>
+                <rect x="13" y="24" width="14" height="4"  fill="#d4a820"/>
+                <rect x="10" y="28" width="20" height="5"  fill="#999"/>
+                <rect x="12" y="33" width="16" height="5"  fill="#777"/>
+                <rect x="14" y="38" width="12" height="5"  fill="#555"/>
+            </svg>
+            <div class="hint-rays" id="hint-rays-wrap">
+                <div class="hint-ray" style="transform:rotate(0deg)   translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(45deg)  translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(90deg)  translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(135deg) translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(180deg) translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(225deg) translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(270deg) translateX(22px)"></div>
+                <div class="hint-ray" style="transform:rotate(315deg) translateX(22px)"></div>
+            </div>
+        </div>
+        <div class="hint-label">HINT<br><span style="color:#888;font-size:0.42rem;">(-3 sec)</span></div>
+    </div>
+    
+    <div id="hint-display" style="display:none; position:absolute; top:252px; left:50%; transform:translateX(-50%); background:rgba(0,15,40,0.97); border:3px solid var(--pixel-yellow); color:var(--pixel-yellow); padding:12px 20px; font-size:0.65rem; line-height:1.9; z-index:20; max-width:64%; text-align:center; box-shadow:0 0 20px rgba(255,180,0,0.3); word-spacing:6px; word-break:break-word;"></div>
+
+    <div id="runner-area">
+        <div id="player" class="sprite-anim state-run"></div>
+        <div id="approaching-threat" class="sprite-anim"></div>
+    </div>
+    
+    <div id="options-deck">
+        <div class="gate" onclick="checkAnswer(this)">Opt 1</div>
+        <div class="gate" onclick="checkAnswer(this)">Opt 2</div>
+        <div class="gate" onclick="checkAnswer(this)">Opt 3</div>
+    </div>
+</div>
+
+<div id="codex-modal">
+    <div class="codex-content">
+        <div class="codex-header">
+            <h2 id="codex-title">GATE UNLOCKED!</h2>
+            <h1 id="codex-word">WORD</h1>
+        </div>
+        <div class="codex-body">
+            <div class="meaning core"><strong>Core Meaning:</strong><br><span id="codex-core">...</span></div>
+            <div class="meaning hidden"><strong>Hidden Meaning:</strong><br><span id="codex-hidden">...</span></div>
+            
+            <!-- 干扰项对比说明 -->
+            <div id="codex-distractor-explanation"></div>
+            
+            <div id="codex-context-replay"></div>
+            <div id="codex-memory-tip"></div>
+            <div id="codex-recall-section">
+                <span class="recall-label">🧠 ACTIVE RECALL — type the correct word to lock it into memory:</span>
+                <input type="text" id="recall-input" placeholder="type the word..." onkeydown="handleRecallKey(event)" autocomplete="off" spellcheck="false">
+                <div id="recall-feedback">Enter the word above, then press Enter or Submit.</div>
+                <button class="recall-submit-btn" onclick="checkRecall()">Submit →</button>
+            </div>
+        </div>
+        <div class="codex-footer">
+            <button class="pixel-btn" id="codex-continue-btn" onclick="processNextQuestion()">Keep Running</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ================================================================
+   AUDIO SYSTEM (新增平滑过渡淡入淡出 & Summit BGM)
+   ================================================================ */
+const audioTracks = {
+    easy: new Audio('assets/bgm_easy.wav'),
+    medium: new Audio('assets/bgm_medium.wav'),
+    hard: new Audio('assets/bgm_hard.wav'),
+    nightmare: new Audio('assets/bgm_nightmare.wav'),
+    campfire: new Audio('assets/bgm_campfire.wav'),
+    summit: new Audio('assets/bgm_summit.wav') // 新增 Summit 音乐
+};
+
+// 设置所有音乐循环播放，并初始化音量
+Object.values(audioTracks).forEach(audio => {
+    audio.loop = true;
+    audio.volume = 1;
+});
+
+let currentBGM = null;
+let fadeOutInterval = null;
+let fadeInInterval = null;
+
+function playBGM(trackName) {
+    const nextBGM = audioTracks[trackName];
+    if (currentBGM === nextBGM) return; // 如果已经在播放该音乐，则不打断
+    
+    // 清除可能正在进行的渐变动画，防止冲突
+    if (fadeOutInterval) clearInterval(fadeOutInterval);
+    if (fadeInInterval) clearInterval(fadeInInterval);
+
+    const fadeDuration = 1000; // 渐变时间 1000ms (1秒)
+    const steps = 20;          // 渐变步数
+    const stepTime = fadeDuration / steps;
+
+    if (currentBGM) {
+        // 1. 渐出当前音乐
+        let vol = currentBGM.volume;
+        fadeOutInterval = setInterval(() => {
+            vol -= 1 / steps;
+            if (vol <= 0) {
+                vol = 0;
+                clearInterval(fadeOutInterval);
+                currentBGM.pause();
+                currentBGM.currentTime = 0; // 重置到开头
+                currentBGM.volume = 1;      // 恢复音量以备下次直接使用
+                
+                // 2. 当前音乐完全停止后，开始渐入新音乐
+                startFadeIn(nextBGM, steps, stepTime);
+            } else {
+                currentBGM.volume = vol;
+            }
+        }, stepTime);
+    } else {
+        // 如果没有当前音乐（比如刚进游戏），直接渐入新音乐
+        startFadeIn(nextBGM, steps, stepTime);
+    }
+}
+
+function startFadeIn(bgm, steps, stepTime) {
+    currentBGM = bgm;
+    if (!currentBGM) return;
+
+    currentBGM.volume = 0; // 从0开始
+    currentBGM.play().catch(e => console.log("Audio play failed:", e));
+
+    let vol = 0;
+    fadeInInterval = setInterval(() => {
+        vol += 1 / steps;
+        if (vol >= 1) {
+            vol = 1;
+            clearInterval(fadeInInterval);
+        }
+        currentBGM.volume = vol;
+    }, stepTime);
+}
+
+// 初始化游戏（解锁音频限制并显示封面）
+function initGameAudio() {
+    document.getElementById('init-screen').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'block';
+    playBGM('easy'); // 封面播放 easy 音乐
+}
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let maxHp = 5, hp = 5;
+let isProcessing = false;
+let nextRoundBonusTime = 0;
+let lastAnswerCorrect = true;
+let hintUsed = false;
+let recallCompleted = false;
+
+let summitDialogueIndex = 0;
+let isTypingDialogue = false;
+let currentTypewriterTimeout = null;
+
+/* ================================================================
+   MONSTER ASSETS
+   ================================================================ */
+const monsterAssets = {
+    EASY:      [{ src:'assets/monsters/easy/mushroom_run.png',  frames:8,  width:80, height:64, flip:false }],
+    MEDIUM:    [{ src:'assets/monsters/medium/enemy_run.png',   frames:8,  width:64, height:64, flip:false }],
+    HARD:      [
+        { src:'assets/monsters/hard/golem_1_run.png', frames:10, width:90, height:64, flip:true },
+        { src:'assets/monsters/hard/golem_2_run.png', frames:10, width:90, height:64, flip:true }
+    ],
+    NIGHTMARE: [{ src:'assets/monsters/nightmare/bat-run.png',  frames:8,  width:64, height:64, flip:false }]
+};
+
+/* ================================================================
+   DIALOGUE
+   ================================================================ */
+const summitDialogues = [
+    "...You actually made it.",
+    "Every word that caught you off guard? Those are the ones you will never forget now. That is what this was all for.",
+    "Polysemy is proof that language is alive. One word, a hundred different worlds. You have started to see that.",
+    "Mistakes are not failure here. They are the whole point. You can not learn what you already know.",
+    "Nightmare Mode is waiting. It is harder. But I think you are ready.  ♥"
+];
+
+/* ================================================================
+   TIMER & PHASE STATE
+   ================================================================ */
+let runTimer = null;
+let animationDuration = 18000;
+let startTime = 0;
+let timeRemaining = 0;
+let isPaused = false;
+let currentPhaseIndex = 0;
+const phaseNames = ["EASY","MEDIUM","HARD","NIGHTMARE"];
+let activePool = [], allQuestions = [];
+let nightmareLevel = 1;
+let mistakeStats = {};
+
+const gameContainer = document.getElementById('game-container');
+const player        = document.getElementById('player');
+const threat        = document.getElementById('approaching-threat');
+const timerBar      = document.getElementById('timer-bar');
+const intermissionScreen = document.getElementById('intermission-screen');
+const pauseScreen   = document.getElementById('pause-screen');
+
+function shuffleArray(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+
+/* ================================================================
+   START / GAME-OVER / QUIT
+   ================================================================ */
+function startGame() {
+    player.className = "sprite-anim state-run";
+    document.getElementById('start-screen').style.display = 'none';
+    gameContainer.style.display = 'block';
+    
+    allQuestions = [...easyPool, ...mediumPool, ...hardPool];
+    mistakeStats = {};
+    updateHpDisplay();
+    
+    setupPhase(0); 
+}
+
+function gameOver(customMsg) {
+    isProcessing = true;
+    clearTimeout(runTimer);
+    if (currentBGM) currentBGM.pause(); // 游戏结束时直接暂停音乐
+    gameContainer.style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'flex';
+    if (customMsg) document.getElementById('game-over-msg').innerText = customMsg;
+    document.getElementById('game-over-review-list').innerHTML = generateReviewHTML(1);
+}
+
+function quitGame() {
+    pauseScreen.style.display = 'none';
+    hp = 0;
+    gameOver("You chose to retreat to the camp.");
+}
+
+/* ================================================================
+   PHASE SETUP & THEME
+   ================================================================ */
+function setupPhase(index) {
+    currentPhaseIndex = index;
+    if      (index === 0) activePool = shuffleArray([...easyPool]).slice(0, 1);
+    else if (index === 1) activePool = shuffleArray([...mediumPool]).slice(0, 1);
+    else if (index === 2) activePool = shuffleArray([...hardPool]).slice(0, 1);
+    else activePool = [allQuestions[Math.floor(Math.random() * allQuestions.length)]];
+    loadQuestion();
+}
+
+function updateTheme() {
+    const root = document.documentElement;
+    const bgOverlay      = document.getElementById('bg-overlay');
+    const phaseNameText  = document.getElementById('phase-name');
+    const poolCountText  = document.getElementById('pool-count');
+
+    if (currentPhaseIndex === 0) {
+        gameContainer.style.backgroundImage = "url('assets/easy_image.png')";
+        root.style.setProperty('--bg-aspect-ratio','1.7916');
+        root.style.setProperty('--theme-color','var(--pixel-green)');
+        bgOverlay.style.background = 'rgba(0,0,0,0.2)';
+        animationDuration = 18000;
+        playBGM('easy'); 
+    } else if (currentPhaseIndex === 1) {
+        gameContainer.style.backgroundImage = "url('assets/medium_image.png')";
+        root.style.setProperty('--bg-aspect-ratio','1.7916');
+        root.style.setProperty('--theme-color','var(--pixel-yellow)');
+        bgOverlay.style.background = 'rgba(20,10,0,0.4)';
+        animationDuration = 15000;
+        playBGM('medium'); 
+    } else if (currentPhaseIndex === 2) {
+        gameContainer.style.backgroundImage = "url('assets/hard_image.png')";
+        root.style.setProperty('--bg-aspect-ratio','1.7916');
+        root.style.setProperty('--theme-color','var(--pixel-red)');
+        bgOverlay.style.background = 'rgba(30,0,0,0.6)';
+        animationDuration = 12000;
+        playBGM('hard'); 
+    } else {
+        gameContainer.style.backgroundImage = "url('assets/nightmare_image.png')";
+        root.style.setProperty('--bg-aspect-ratio','2.1333');
+        root.style.setProperty('--theme-color','var(--pixel-purple)');
+        bgOverlay.style.background = 'rgba(20,0,30,0.7)';
+        animationDuration = Math.max(6000, 12000 - nightmareLevel * 200);
+        phaseNameText.innerText    = "NIGHTMARE";
+        poolCountText.innerText    = `Lv.${nightmareLevel}`;
+        phaseNameText.style.color  = "var(--pixel-purple)";
+        playBGM('nightmare'); 
+        return;
+    }
+    phaseNameText.innerText = phaseNames[currentPhaseIndex];
+    poolCountText.innerText = activePool.length;
+}
+
+/* ================================================================
+   LOAD QUESTION
+   ================================================================ */
+function loadQuestion() {
+    isProcessing = false;
+    isPaused = false;
+    hintUsed = false;
+    recallCompleted = false;
+    updateTheme();
+
+    const hintBtn     = document.getElementById('hint-btn');
+    const hintDisplay = document.getElementById('hint-display');
+    hintBtn.className = '';
+    hintBtn.style.display = 'flex';
+    hintDisplay.style.display = 'none';
+    document.querySelectorAll('#hint-bulb-svg .bulb-g').forEach(r => r.setAttribute('fill','#ffe87a'));
+
+    const data = activePool[0];
+    document.getElementById('sentence-part-1').innerText = data.contextPart1;
+    document.getElementById('sentence-part-2').innerText = data.contextPart2;
+    document.getElementById('blank-zone').innerText = "____";
+
+    const phaseKey = currentPhaseIndex >= 3 ? "NIGHTMARE" : phaseNames[currentPhaseIndex];
+    const pool     = monsterAssets[phaseKey];
+    const monster  = pool[Math.floor(Math.random() * pool.length)];
+    threat.style.backgroundImage = `url('${monster.src}')`;
+    threat.style.setProperty('--frames', monster.frames);
+    threat.style.setProperty('--sprite-width', monster.width + 'px');
+    threat.style.width  = monster.width + 'px';
+    threat.style.height = (monster.height || 64) + 'px';
+    threat.dataset.flip = monster.flip ? "true" : "false";
+    threat.className    = 'sprite-anim';
+
+    player.className = 'sprite-anim state-run';
+    gameContainer.classList.add('scrolling');
+    gameContainer.classList.remove('paused-anim');
+
+    const gates   = document.querySelectorAll('.gate');
+    const shuffled = shuffleArray(data.options);
+    gates.forEach((gate, i) => {
+        gate.innerText      = shuffled[i];
+        gate.className      = 'gate';
+        gate.style.opacity  = '1';
+        gate.style.background = '#222';
+        gate.dataset.word   = shuffled[i];
+    });
+
+    document.getElementById('options-deck').style.display = 'flex';
+    document.getElementById('top-controls').style.display = 'flex';
+    timeRemaining = animationDuration;
+    startThreatApproach(timeRemaining);
+}
+
+/* ================================================================
+   TIMER & APPROACH
+   ================================================================ */
+function startThreatApproach(time) {
+    threat.style.transition   = 'none';
+    timerBar.style.transition = 'none';
+    const scaleX = threat.dataset.flip === "true" ? -4 : 4;
+
+    if (time === animationDuration) {
+        threat.style.transform = `translateX(10vw) scaleX(${scaleX}) scaleY(4)`;
+        timerBar.style.width   = '100%';
+    }
+    setTimeout(() => {
+        threat.style.transition   = `transform ${time}ms linear`;
+        threat.style.transform    = `translateX(-70vw) scaleX(${scaleX}) scaleY(4)`;
+        timerBar.style.transition = `width ${time}ms linear`;
+        timerBar.style.width      = '0%';
+        startTime = Date.now();
+        runTimer  = setTimeout(handleCrash, time);
+    }, 50);
+}
+
+/* ================================================================
+   PAUSE
+   ================================================================ */
+function togglePause() {
+    if (isProcessing || document.getElementById('codex-modal').style.display === 'flex') return;
+    if (!isPaused) {
+        isPaused = true;
+        clearTimeout(runTimer);
+        const elapsed    = Date.now() - startTime;
+        timeRemaining   -= elapsed;
+        threat.style.transform    = window.getComputedStyle(threat).transform;
+        threat.style.transition   = 'none';
+        timerBar.style.width      = window.getComputedStyle(timerBar).width;
+        timerBar.style.transition = 'none';
+        gameContainer.classList.add('paused-anim');
+        player.classList.add('paused-anim');
+        threat.classList.add('paused-anim');
+        document.getElementById('options-deck').style.display = 'none';
+        document.getElementById('hint-btn').style.display    = 'none';
+        pauseScreen.style.display = 'flex';
+    } else {
+        isPaused = false;
+        pauseScreen.style.display = 'none';
+        document.getElementById('options-deck').style.display = 'flex';
+        if (!hintUsed) document.getElementById('hint-btn').style.display = 'flex';
+        gameContainer.classList.remove('paused-anim');
+        player.classList.remove('paused-anim');
+        threat.classList.remove('paused-anim');
+        startThreatApproach(timeRemaining);
+    }
+}
+
+/* ================================================================
+   HINT
+   ================================================================ */
+function showHint() {
+    if (hintUsed || isPaused || isProcessing) return;
+    hintUsed = true;
+
+    document.querySelectorAll('#hint-bulb-svg .bulb-g').forEach(r => r.setAttribute('fill','#555'));
+    document.getElementById('hint-btn').classList.add('hint-used');
+
+    const data       = activePool[0];
+    const firstLetter = data.correctWord[0].toUpperCase();
+    const snippet    = data.coreMeaning.length > 52
+        ? data.coreMeaning.substring(0, 50) + '…'
+        : data.coreMeaning;
+
+    const hintDisplay = document.getElementById('hint-display');
+    hintDisplay.innerHTML = `💡 Starts with "<strong style="color:white;">${firstLetter}…</strong>"&ensp;|&ensp;<em>${snippet}</em>`;
+    hintDisplay.style.display = 'block';
+
+    clearTimeout(runTimer);
+    const elapsed     = Date.now() - startTime;
+    timeRemaining     = Math.max(1200, timeRemaining - elapsed - 3000);
+    startThreatApproach(timeRemaining);
+}
+
+/* ================================================================
+   CHECK ANSWER
+   ================================================================ */
+function checkAnswer(clickedGate) {
+    if (isProcessing || isPaused) return;
+    const word = clickedGate.dataset.word;
+    const data = activePool[0];
+
+    if (word === data.correctWord) {
+        isProcessing = true;
+        lastAnswerCorrect = true;
+        clearTimeout(runTimer);
+        threat.style.transform  = window.getComputedStyle(threat).transform;
+        threat.style.transition = 'none';
+        gameContainer.classList.remove('scrolling');
+
+        clickedGate.classList.add('correct');
+        document.getElementById('blank-zone').innerText   = word;
+        document.getElementById('hint-btn').style.display = 'none';
+        document.getElementById('hint-display').style.display = 'none';
+        document.querySelectorAll('.gate').forEach(g => { if (g !== clickedGate) g.style.opacity = '0.3'; });
+        player.className = 'sprite-anim state-attack';
+        document.getElementById('top-controls').style.display = 'none';
+
+        triggerRandomChest();
+        setTimeout(() => showCodex(data, true), 1200);
+    } else {
+        handleCrash(clickedGate);
+    }
+}
+
+/* ================================================================
+   TREASURE CHEST
+   ================================================================ */
+function triggerRandomChest() {
+    if (Math.random() > 0.3) return;
+
+    const buffs = [
+        { type:'HEAL',   emoji:'❤️', label:'HP +1 Restored!',   color:'var(--pixel-green)'  },
+        { type:'TIME',   emoji:'⏳', label:'+5 sec Next Round!', color:'var(--pixel-blue)'   },
+        { type:'MAX_HP', emoji:'⭐', label:'Max HP Increased!',  color:'var(--pixel-yellow)' }
+    ];
+    const buff = buffs[Math.floor(Math.random() * buffs.length)];
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chest-wrapper';
+    wrapper.innerHTML = `
+        <div class="chest-aura"></div>
+        <div class="chest-pixel">
+            <div class="chest-lid"></div>
+            <div class="chest-body"></div>
+        </div>`;
+    document.getElementById('runner-area').appendChild(wrapper);
+
+    setTimeout(() => {
+        const lid = wrapper.querySelector('.chest-lid');
+        if (lid) lid.classList.add('lid-open');
+
+        if      (buff.type === 'HEAL')   { hp = Math.min(hp + 1, maxHp); updateHpDisplay(); }
+        else if (buff.type === 'TIME')   { nextRoundBonusTime = 5000; }
+        else if (buff.type === 'MAX_HP') { maxHp++; hp++; updateHpDisplay(); }
+
+        spawnChestSparkles(wrapper.querySelector('.chest-pixel'));
+
+        const itemEl = document.createElement('div');
+        itemEl.className = 'chest-item-out';
+        itemEl.innerText = buff.emoji;
+        wrapper.querySelector('.chest-pixel').appendChild(itemEl);
+
+        const label = document.createElement('div');
+        label.className  = 'floating-buff';
+        label.innerText  = buff.label;
+        label.style.color = buff.color;
+        label.style.left  = '22%';
+        label.style.bottom = '140px';
+        document.getElementById('runner-area').appendChild(label);
+
+        setTimeout(() => {
+            label.remove();
+            wrapper.style.transition = 'opacity 0.5s';
+            wrapper.style.opacity    = '0';
+            setTimeout(() => wrapper.remove(), 500);
+        }, 1700);
+    }, 520);
+}
+
+function spawnChestSparkles(container) {
+    const colors = ['#FFD700','#FFE87A','#FFFFFF','#FF8C00','#FFF0A0'];
+    for (let i = 0; i < 8; i++) {
+        const angle   = (i / 8) * Math.PI * 2;
+        const speed   = 38 + Math.random() * 28;
+        const vx      = Math.cos(angle) * speed;
+        const vy      = Math.sin(angle) * speed;
+        const gravity = 120;
+
+        const el = document.createElement('div');
+        el.className = 'chest-sparkle';
+        const sz = Math.random() > 0.4 ? 6 : 4;
+        el.style.cssText = `
+            width:${sz}px; height:${sz}px;
+            background:${colors[i % colors.length]};
+            left:26px; top:20px;
+            box-shadow: ${sz}px 0 0 ${colors[(i+2)%colors.length]},
+                        0 ${sz}px 0 ${colors[(i+4)%colors.length]};
+        `;
+        container.appendChild(el);
+
+        const t0 = Date.now();
+        const startX = 26, startY = 20;
+        (function animSpark() {
+            const t = (Date.now() - t0) / 1000;
+            if (t > 0.75) { el.remove(); return; }
+            el.style.left    = (startX + vx * t)                   + 'px';
+            el.style.top     = (startY + vy * t + 0.5 * gravity * t * t) + 'px';
+            el.style.opacity = Math.max(0, 1 - t / 0.75);
+            requestAnimationFrame(animSpark);
+        })();
+    }
+}
+
+/* ================================================================
+   HANDLE CRASH
+   ================================================================ */
+function handleCrash(wrongGate = null) {
+    if (isProcessing) return;
+    isProcessing = true;
+    lastAnswerCorrect = false;
+    clearTimeout(runTimer);
+    const data = activePool[0];
+    mistakeStats[data.correctWord] = (mistakeStats[data.correctWord] || 0) + 1;
+
+    threat.style.transform  = window.getComputedStyle(threat).transform;
+    threat.style.transition = 'none';
+    gameContainer.classList.remove('scrolling');
+    document.getElementById('hint-btn').style.display    = 'none';
+    document.getElementById('hint-display').style.display = 'none';
+
+    let wrongWord = null;
+    if (wrongGate) {
+        wrongGate.style.background = 'var(--pixel-red)';
+        wrongWord = wrongGate.dataset.word;
+    }
+
+    document.body.classList.add('shake');
+    document.getElementById('blood-overlay').style.opacity = '1';
+    player.className = 'sprite-anim state-hurt';
+    document.getElementById('top-controls').style.display = 'none';
+    hp--;
+    updateHpDisplay();
+
+    setTimeout(() => {
+        document.body.classList.remove('shake');
+        document.getElementById('blood-overlay').style.opacity = '0';
+        if (hp <= 0) gameOver();
+        else showCodex(data, false, wrongWord);
+    }, 800);
+}
+
+/* ================================================================
+   CODEX / LESSON MODAL
+   ================================================================ */
+function showCodex(data, isSuccess, wrongWord = null) {
+    const titleEl    = document.getElementById('codex-title');
+    const wordEl     = document.getElementById('codex-word');
+    const coreEl     = document.getElementById('codex-core');
+    const hiddenEl   = document.getElementById('codex-hidden');
+    const replayEl   = document.getElementById('codex-context-replay');
+    const memTipEl   = document.getElementById('codex-memory-tip');
+    const recallSec  = document.getElementById('codex-recall-section');
+    const continueBtn = document.getElementById('codex-continue-btn');
+    const recallInput = document.getElementById('recall-input');
+    const recallFB   = document.getElementById('recall-feedback');
+    const distractorEl = document.getElementById('codex-distractor-explanation');
+
+    wordEl.innerText   = data.correctWord;
+    coreEl.innerText   = data.coreMeaning;
+    hiddenEl.innerText = data.hiddenMeaning;
+    hiddenEl.style.color = "var(--theme-color)";
+
+    recallCompleted    = false;
+    recallInput.value  = '';
+    recallInput.className = '';
+    recallFB.innerText = 'Enter the word above, then press Enter or Submit.';
+    recallFB.style.color = '#888';
+
+    if (isSuccess) {
+        titleEl.innerText   = currentPhaseIndex >= 3 ? "NIGHTMARE SURVIVED!" : "GATE UNLOCKED!";
+        titleEl.style.color = "var(--theme-color)";
+        replayEl.style.display  = 'none';
+        memTipEl.style.display  = 'none';
+        recallSec.style.display = 'none';
+        distractorEl.style.display = 'none';
+        continueBtn.innerText      = 'Keep Running ▶';
+        continueBtn.style.cssText  = ''; 
+    } else {
+        titleEl.innerText   = "LESSON LEARNED!";
+        titleEl.style.color = "var(--pixel-red)";
+
+        if (wrongWord) {
+            const explanation = (data.explanations && data.explanations[wrongWord]) 
+                ? data.explanations[wrongWord] 
+                : `You chose "<b>${wrongWord}</b>". While it might seem related, the context requires a word meaning "<em>${data.hiddenMeaning.split('.')[0]}</em>", making "<b>${data.correctWord}</b>" the only exact fit here.`;
+            distractorEl.innerHTML = `❌ <strong>Why not "${wrongWord}"?</strong><br>${explanation}`;
+            distractorEl.style.display = 'block';
+        } else {
+            distractorEl.style.display = 'none';
+        }
+
+        replayEl.innerHTML = `📖 <em>In context:</em><br>
+            "${data.contextPart1} <span class="replay-highlight">${data.correctWord}</span> ${data.contextPart2}"`;
+        replayEl.style.display = 'block';
+
+        memTipEl.innerHTML  = buildMemoryTip(data);
+        memTipEl.style.display = 'block';
+
+        recallSec.style.display = 'block';
+        continueBtn.innerText   = 'Skip & Keep Running';
+        continueBtn.style.cssText =
+            'background:#1a1a1a; border-color:#555; color:#888; margin-top:0;';
+        setTimeout(() => recallInput.focus(), 160);
+    }
+
+    document.getElementById('codex-modal').style.display = 'flex';
+    document.querySelector('.codex-body').scrollTop = 0;
+}
+
+const memoryTipTemplates = [
+    d => `🔑 Pay attention to what surrounds the blank. The sentence describes "${d.hiddenMeaning.split('.')[0].toLowerCase()}".`,
+    d => `🧩 Cover the answer and re-read the sentence. Ask: "What situation is this?" — not just "What word?"`,
+    d => `✏️ "<strong>${d.correctWord}</strong>" has more than one life. Here it lives as: <em>${d.hiddenMeaning.split('.')[0]}</em>.`,
+    d => `💡 Polysemy tip: if the literal meaning feels odd in context, look for the figurative sense.`
+];
+function buildMemoryTip(data) {
+    const fn = memoryTipTemplates[Math.floor(Math.random() * memoryTipTemplates.length)];
+    return `🎯 <strong>MEMORY TIP</strong><br><span style="font-weight:normal;">${fn(data)}</span>`;
+}
+
+function handleRecallKey(e) { if (e.key === 'Enter') checkRecall(); }
+
+function checkRecall() {
+    if (recallCompleted) return;
+    const data    = activePool[0];
+    const input   = document.getElementById('recall-input');
+    const fb      = document.getElementById('recall-feedback');
+    const btn     = document.getElementById('codex-continue-btn');
+    const typed   = input.value.trim().toLowerCase();
+    const correct = data.correctWord.toLowerCase();
+
+    if (typed === correct) {
+        recallCompleted = true;
+        input.classList.add('recall-correct');
+        fb.innerText   = '✓ Correct! Memory reinforced.';
+        fb.style.color = 'var(--pixel-green)';
+        btn.innerText = 'Keep Running ▶';
+        btn.style.cssText =
+            'background:#112211; border-color:var(--pixel-green); color:var(--pixel-green); margin-top:0;';
+    } else if (typed === '') {
+        fb.innerText   = 'Type the correct word to reinforce your memory.';
+        fb.style.color = '#888';
+    } else {
+        input.classList.add('recall-wrong');
+        fb.innerText   = `✗ Not quite. Hint: starts with "${data.correctWord[0].toUpperCase()}…"`;
+        fb.style.color = 'var(--pixel-red)';
+        setTimeout(() => input.classList.remove('recall-wrong'), 400);
+    }
+}
+
+/* ================================================================
+   PROCESS NEXT QUESTION
+   ================================================================ */
+function processNextQuestion() {
+    document.getElementById('codex-modal').style.display = 'none';
+    player.className = 'sprite-anim state-dash';
+
+    animationDuration += nextRoundBonusTime;
+    nextRoundBonusTime = 0;
+
+    setTimeout(() => {
+        if (lastAnswerCorrect) {
+            if (currentPhaseIndex >= 3) { nightmareLevel++; setupPhase(3); return; }
+            activePool.shift();
+            if (activePool.length === 0) checkIntermission();
+            else loadQuestion();
+        } else {
+            const failed = activePool.shift();
+            activePool.push(failed);
+            loadQuestion();
+        }
+    }, 600);
+}
+
+/* ================================================================
+   REVIEW HTML
+   ================================================================ */
+function generateReviewHTML(threshold) {
+    let html = '', hasMistakes = false;
+    for (const [word, count] of Object.entries(mistakeStats)) {
+        if (count >= threshold) {
+            hasMistakes = true;
+            const wd = allQuestions.find(q => q.correctWord === word);
+            if (wd) html += `
+                <div class="review-item">
+                    <span class="review-word">${word}</span> (Failed ${count} time${count>1?'s':''})<br>
+                    <span style="color:#aaa;">Core:</span> ${wd.coreMeaning}<br>
+                    <span style="color:var(--pixel-green);">Hidden:</span> ${wd.hiddenMeaning}
+                </div>`;
+        }
+    }
+    if (!hasMistakes) html = "<p style='color:var(--pixel-green);'>Perfect execution! No errors logged.</p>";
+    return html;
+}
+
+/* ================================================================
+   INTERMISSION (CAMPFIRE REST)
+   ================================================================ */
+function checkIntermission() {
+    gameContainer.style.display = 'none';
+    
+    // 播放篝火休息音乐 (平滑过渡)
+    playBGM('campfire');
+    
+    // 篝火休息，恢复2点生命值
+    hp = Math.min(hp + 2, maxHp);
+    updateHpDisplay();
+    
+    document.getElementById('review-list').innerHTML = generateReviewHTML(2);
+
+    const nextBtn = document.getElementById('intermission-next-btn');
+    const titleEl = document.getElementById('intermission-title');
+    nextBtn.removeAttribute('onclick');
+
+    if (currentPhaseIndex === 2) {
+        titleEl.innerText   = "PEAK REACHED";
+        titleEl.style.color = "var(--pixel-yellow)";
+        nextBtn.innerText   = "Ascend the Summit";
+        nextBtn.onclick     = showSummitScreen;
+    } else {
+        titleEl.innerText   = "REGION CLEARED";
+        titleEl.style.color = "var(--pixel-green)";
+        nextBtn.innerText   = "Enter Next Region";
+        nextBtn.onclick     = startNextPhase;
+    }
+    intermissionScreen.style.display = 'flex';
+}
+
+/* ================================================================
+   SUMMIT SCREEN
+   ================================================================ */
+function showSummitScreen() {
+    intermissionScreen.style.display = 'none';
+    const screen  = document.getElementById('summit-screen');
+    const warrior = document.getElementById('summit-warrior');
+    const wrapper = document.getElementById('summit-dialogue-wrapper');
+
+    // 播放山顶结算音乐 (平滑过渡)
+    playBGM('summit');
+
+    summitDialogueIndex = 0;
+    wrapper.classList.remove('dlg-visible');
+    document.getElementById('dialogue-continue-btn').style.display = 'none';
+    document.getElementById('dialogue-text').innerText = '';
+    const oldBtn = document.getElementById('nightmare-launch-btn');
+    if (oldBtn) oldBtn.remove();
+
+    screen.style.display = 'block';
+
+    spawnSummitStars();
+
+    // Warrior stands still and breathes
+    warrior.className          = 'warrior-breathe';
+    warrior.style.transition   = 'none';
+    warrior.style.left         = 'calc(50% - 48px)';
+    warrior.style.bottom       = '20%'; 
+    warrior.style.transform    = 'scale(5) translateZ(0)';
+    warrior.style.backgroundImage = "url('assets/character/run.png')";
+    warrior.style.backgroundPosition = "0px 0px"; 
+    warrior.style.width = '96px';
+    warrior.style.height = '64px';
+
+    setTimeout(() => {
+        wrapper.classList.add('dlg-visible');
+        setTimeout(startSummitDialogue, 500);
+    }, 1500);
+}
+
+function spawnSummitStars() {
+    const container = document.getElementById('summit-stars');
+    container.innerHTML = '';
+    for (let i = 0; i < 40; i++) {
+        const s = document.createElement('div');
+        s.className = 'summit-star';
+        const sz = Math.random() > 0.55 ? 3 : 2;
+        s.style.width  = sz + 'px';
+        s.style.height = sz + 'px';
+        s.style.left   = (Math.random() * 100) + '%';
+        s.style.top    = (Math.random() * 60) + '%';
+        s.style.animationDelay    = (Math.random() * 2)   + 's';
+        s.style.animationDuration = (1.5 + Math.random() * 3) + 's';
+        container.appendChild(s);
+    }
+}
+
+function startSummitDialogue() {
+    if (summitDialogueIndex >= summitDialogues.length) { showNightmarePrompt(); return; }
+    const textEl  = document.getElementById('dialogue-text');
+    const contBtn = document.getElementById('dialogue-continue-btn');
+    contBtn.style.display = 'none';
+    typewriter(textEl, summitDialogues[summitDialogueIndex], 36, () => {
+        contBtn.style.display = 'inline-block';
+    });
+}
+
+function advanceSummitDialogue() {
+    if (isTypingDialogue) {
+        if (currentTypewriterTimeout) clearTimeout(currentTypewriterTimeout);
+        isTypingDialogue = false;
+        document.getElementById('dialogue-text').textContent = summitDialogues[summitDialogueIndex]; 
+        document.getElementById('dialogue-continue-btn').style.display = 'inline-block';
+        return;
+    }
+    document.getElementById('dialogue-continue-btn').style.display = 'none';
+    summitDialogueIndex++;
+    if (summitDialogueIndex >= summitDialogues.length) showNightmarePrompt();
+    else startSummitDialogue();
+}
+
+function typewriter(el, text, speed, onDone) {
+    isTypingDialogue = true;
+    el.textContent = '';
+    let i = 0;
+    function step() {
+        if (i < text.length) {
+            el.textContent += text[i++];
+            currentTypewriterTimeout = setTimeout(step, speed);
+        } else {
+            isTypingDialogue = false;
+            if (onDone) onDone();
+        }
+    }
+    step();
+}
+
+function showNightmarePrompt() {
+    const textEl  = document.getElementById('dialogue-text');
+    const contBtn = document.getElementById('dialogue-continue-btn');
+    contBtn.style.display = 'none';
+
+    textEl.innerHTML = `<span style="color:var(--pixel-red);">Ready for NIGHTMARE MODE?</span><br>` +
+        `<span style="font-size:0.58rem;color:#c8b080;">Everything you learned — now under pressure.</span>`;
+
+    const btn = document.createElement('button');
+    btn.id        = 'nightmare-launch-btn';
+    btn.className = 'pixel-btn';
+    btn.style.cssText =
+        'background:var(--pixel-purple);border-color:var(--pixel-purple);margin-top:12px;font-size:0.68rem;';
+    btn.innerText = '  ENTER NIGHTMARE  ';
+    btn.onclick   = startNightmareMode;
+    document.getElementById('dialogue-text-area').appendChild(btn);
+}
+
+/* ================================================================
+   NIGHTMARE / NEXT PHASE
+   ================================================================ */
+function startNightmareMode() {
+    document.getElementById('summit-screen').style.display = 'none';
+    gameContainer.style.display = 'block';
+    setupPhase(3);
+}
+
+function startNextPhase() {
+    intermissionScreen.style.display = 'none';
+    gameContainer.style.display = 'block';
+    setupPhase(currentPhaseIndex + 1);
+}
+
+/* ================================================================
+   HP DISPLAY
+   ================================================================ */
+function updateHpDisplay() {
+    const c = document.getElementById('hearts');
+    if (!c) return;
+    c.innerHTML = '';
+    for (let i = 0; i < maxHp; i++) {
+        const h = document.createElement('div');
+        h.className = 'heart-icon';
+        if (i >= hp) h.classList.add('heart-empty');
+        c.appendChild(h);
+    }
+}
+updateHpDisplay();
+</script>
+</body>
+</html>
