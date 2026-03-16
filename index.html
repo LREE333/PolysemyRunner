@@ -58,7 +58,6 @@
             z-index: 100; gap: 30px; background: #111; text-align: center;
         }
 
-        /* 初始点击屏幕（用于解锁音频播放） */
         #init-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; color: white; display: flex;
@@ -71,7 +70,6 @@
             50% { opacity: 0.5; }
         }
 
-        /* 修改后的 Start Screen（使用图片作为背景） */
         #start-screen {
             display: none; 
             background-image: url('assets/cover.png'); 
@@ -81,13 +79,48 @@
             display: block; 
         }
 
-        /* 透明的 START QUEST 点击区域 - 调整了位置和大小 */
+        #player-info-container {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+            z-index: 10;
+        }
+
+        #best-record-display {
+            color: var(--pixel-yellow);
+            font-size: 0.8rem;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        #player-nickname {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            color: white;
+            font-family: var(--font-main);
+            font-size: 0.7rem;
+            padding: 8px 10px;
+            text-align: right;
+            width: 160px;
+            outline: none;
+            text-shadow: 1px 1px 0px #000;
+            transition: 0.2s;
+        }
+        #player-nickname::placeholder { color: rgba(255, 255, 255, 0.7); }
+        #player-nickname:focus {
+            border-color: var(--pixel-yellow);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
         #start-quest-hitbox {
             position: absolute;
-            bottom: 5%; /* 之前是8%，导致框偏上，现在调低到5% */
+            bottom: 5%; 
             left: 50%;
             transform: translateX(-50%);
-            width: 230px;  /* 稍微加宽一点以覆盖文字 */
+            width: 230px;  
             height: 55px;  
             background: rgba(0, 0, 0, 0); 
             cursor: pointer;
@@ -100,7 +133,6 @@
             border: 2px dashed rgba(255, 255, 255, 0.5);
         }
         
-        /* Intermission Screen with Campfire Background */
         #intermission-screen {
             display: none; background: #000; z-index: 200; overflow: hidden;
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -181,8 +213,12 @@
 
         #player { position: absolute; left: 10%; bottom: 0; width: var(--sprite-width); overflow: visible; height: 64px; background-repeat: no-repeat; z-index: 6; image-rendering: pixelated; will-change: transform, background-position; transform: scale(6) translateZ(0); transform-origin: bottom center; }
         #approaching-threat { position: absolute; left: 100vw; bottom: 10px; width: 80px; height: 64px; background-repeat: no-repeat; z-index: 5; filter: drop-shadow(-5px 5px 0px rgba(0,0,0,0.8)); transform-origin: bottom center; image-rendering: pixelated; }
+        
         .sprite-anim { animation: play-sprite 0.8s steps(var(--frames)) infinite; }
+        .sprite-die  { animation: play-sprite 0.6s steps(var(--frames)) forwards; }
+        
         @keyframes play-sprite { from { background-position: 0px 0px; } to { background-position: calc(var(--frames) * var(--sprite-width) * -1) 0px; } }
+        
         .state-run    { background-image: url('assets/character/run.png'); --frames: 8; }
         .state-attack { background-image: url('assets/character/attack.png'); --frames: 6; }
         .state-hurt   { background-image: url('assets/character/hurt.png'); --frames: 4; filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(5) drop-shadow(5px 5px 0px rgba(0,0,0,0.8)) !important; }
@@ -193,6 +229,27 @@
         @keyframes screenShake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-10px,10px); } 40% { transform: translate(10px,-10px); } 60% { transform: translate(-10px,-10px); } }
         .floating-buff { position: absolute; font-size: 0.9rem; color: var(--pixel-yellow); text-shadow: 2px 2px 0 #000; z-index: 50; pointer-events: none; animation: floatUp 1.6s ease-out forwards; white-space: nowrap; }
         @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 50% { transform: translateY(-44px) scale(1.2); opacity: 1; } 100% { transform: translateY(-70px) scale(0.9); opacity: 0; } }
+
+        /* ============================================
+           LIGHT WAVE EFFECT
+           ============================================ */
+        .light-wave {
+            position: absolute;
+            bottom: 60px;
+            left: 18%;
+            width: 60px;
+            height: 15px;
+            background: #FFF;
+            border-radius: 50% 100% 100% 50%;
+            box-shadow: 0 0 15px 5px #FFD700, 0 0 30px 10px #FF8C00;
+            z-index: 20;
+            animation: waveTravel 0.3s ease-in forwards;
+        }
+        @keyframes waveTravel {
+            0% { transform: translateX(0) scale(1); opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateX(60vw) scale(1.5); opacity: 0; }
+        }
 
         /* CODEX MODAL & OTHERS */
         #codex-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.93); display: none; justify-content: center; align-items: center; z-index: 1000; }
@@ -282,7 +339,11 @@
 
 <!-- ── Start Screen (封面图) ── -->
 <div id="start-screen" class="full-screen-menu">
-    <!-- 透明的点击区域，覆盖在图片中的 START QUEST 按钮上 -->
+    <div id="player-info-container">
+        <!-- 【修改点】将 Best Nightmare 改为了 Best Record -->
+        <div id="best-record-display">Best Record: Easy</div>
+        <input type="text" id="player-nickname" placeholder="Enter Nickname" autocomplete="off" spellcheck="false">
+    </div>
     <button id="start-quest-hitbox" onclick="startGame()"></button>
 </div>
 
@@ -415,7 +476,6 @@
             <div class="meaning core"><strong>Core Meaning:</strong><br><span id="codex-core">...</span></div>
             <div class="meaning hidden"><strong>Hidden Meaning:</strong><br><span id="codex-hidden">...</span></div>
             
-            <!-- 干扰项对比说明 -->
             <div id="codex-distractor-explanation"></div>
             
             <div id="codex-context-replay"></div>
@@ -435,18 +495,21 @@
 
 <script>
 /* ================================================================
-   AUDIO SYSTEM (新增平滑过渡淡入淡出 & Summit BGM)
+   AUDIO SYSTEM 
    ================================================================ */
 const audioTracks = {
+    start: new Audio('assets/bgm_start.wav'),
     easy: new Audio('assets/bgm_easy.wav'),
     medium: new Audio('assets/bgm_medium.wav'),
     hard: new Audio('assets/bgm_hard.wav'),
     nightmare: new Audio('assets/bgm_nightmare.wav'),
     campfire: new Audio('assets/bgm_campfire.wav'),
-    summit: new Audio('assets/bgm_summit.wav') // 新增 Summit 音乐
+    summit: new Audio('assets/bgm_summit.wav')
 };
 
-// 设置所有音乐循环播放，并初始化音量
+const sfxGameOver = new Audio('assets/sfx_gameover.wav');
+sfxGameOver.loop = false;
+
 Object.values(audioTracks).forEach(audio => {
     audio.loop = true;
     audio.volume = 1;
@@ -458,18 +521,16 @@ let fadeInInterval = null;
 
 function playBGM(trackName) {
     const nextBGM = audioTracks[trackName];
-    if (currentBGM === nextBGM) return; // 如果已经在播放该音乐，则不打断
+    if (currentBGM === nextBGM) return; 
     
-    // 清除可能正在进行的渐变动画，防止冲突
     if (fadeOutInterval) clearInterval(fadeOutInterval);
     if (fadeInInterval) clearInterval(fadeInInterval);
 
-    const fadeDuration = 1000; // 渐变时间 1000ms (1秒)
-    const steps = 20;          // 渐变步数
+    const fadeDuration = 1000; 
+    const steps = 20;          
     const stepTime = fadeDuration / steps;
 
     if (currentBGM) {
-        // 1. 渐出当前音乐
         let vol = currentBGM.volume;
         fadeOutInterval = setInterval(() => {
             vol -= 1 / steps;
@@ -477,17 +538,14 @@ function playBGM(trackName) {
                 vol = 0;
                 clearInterval(fadeOutInterval);
                 currentBGM.pause();
-                currentBGM.currentTime = 0; // 重置到开头
-                currentBGM.volume = 1;      // 恢复音量以备下次直接使用
-                
-                // 2. 当前音乐完全停止后，开始渐入新音乐
+                currentBGM.currentTime = 0; 
+                currentBGM.volume = 1;      
                 startFadeIn(nextBGM, steps, stepTime);
             } else {
                 currentBGM.volume = vol;
             }
         }, stepTime);
     } else {
-        // 如果没有当前音乐（比如刚进游戏），直接渐入新音乐
         startFadeIn(nextBGM, steps, stepTime);
     }
 }
@@ -496,7 +554,7 @@ function startFadeIn(bgm, steps, stepTime) {
     currentBGM = bgm;
     if (!currentBGM) return;
 
-    currentBGM.volume = 0; // 从0开始
+    currentBGM.volume = 0; 
     currentBGM.play().catch(e => console.log("Audio play failed:", e));
 
     let vol = 0;
@@ -510,11 +568,11 @@ function startFadeIn(bgm, steps, stepTime) {
     }, stepTime);
 }
 
-// 初始化游戏（解锁音频限制并显示封面）
 function initGameAudio() {
     document.getElementById('init-screen').style.display = 'none';
     document.getElementById('start-screen').style.display = 'block';
-    playBGM('easy'); // 封面播放 easy 音乐
+    displayBestRecord(); 
+    playBGM('start'); 
 }
 
 /* ================================================================
@@ -531,17 +589,30 @@ let summitDialogueIndex = 0;
 let isTypingDialogue = false;
 let currentTypewriterTimeout = null;
 
+let currentMonster = null; 
+
 /* ================================================================
    MONSTER ASSETS
    ================================================================ */
 const monsterAssets = {
-    EASY:      [{ src:'assets/monsters/easy/mushroom_run.png',  frames:8,  width:80, height:64, flip:false }],
-    MEDIUM:    [{ src:'assets/monsters/medium/enemy_run.png',   frames:8,  width:64, height:64, flip:false }],
-    HARD:      [
-        { src:'assets/monsters/hard/golem_1_run.png', frames:10, width:90, height:64, flip:true },
-        { src:'assets/monsters/hard/golem_2_run.png', frames:10, width:90, height:64, flip:true }
+    EASY: [
+        { src:'assets/monsters/easy/mushroom_run.png', frames:8, width:80, height:64, flip:false,
+          dieSrc:'assets/monsters/easy/mushroom_die.png', dieFrames:15, dieWidth:80 }
     ],
-    NIGHTMARE: [{ src:'assets/monsters/nightmare/bat-run.png',  frames:8,  width:64, height:64, flip:false }]
+    MEDIUM: [
+        { src:'assets/monsters/medium/enemy_run.png', frames:8, width:64, height:64, flip:false,
+          dieSrc:'assets/monsters/medium/enemy_die.png', dieFrames:16, dieWidth:68 }
+    ],
+    HARD: [
+        { src:'assets/monsters/hard/golem_1_run.png', frames:10, width:90, height:64, flip:true,
+          dieSrc:'assets/monsters/hard/golem_1_die.png', dieFrames:12, dieWidth:97.5 },
+        { src:'assets/monsters/hard/golem_2_run.png', frames:10, width:90, height:64, flip:true,
+          dieSrc:'assets/monsters/hard/golem_2_die.png', dieFrames:12, dieWidth:97.5 }
+    ],
+    NIGHTMARE: [
+        { src:'assets/monsters/nightmare/bat-run.png', frames:8, width:64, height:64, flip:false,
+          dieSrc:'assets/monsters/nightmare/bat-die.png', dieFrames:11, dieWidth:(768/11) }
+    ]
 };
 
 /* ================================================================
@@ -582,6 +653,9 @@ function shuffleArray(arr) { return [...arr].sort(() => Math.random() - 0.5); }
    START / GAME-OVER / QUIT
    ================================================================ */
 function startGame() {
+    let nickname = document.getElementById('player-nickname').value.trim() || 'Enter your name';
+    localStorage.setItem('playerNickname', nickname);
+
     player.className = "sprite-anim state-run";
     document.getElementById('start-screen').style.display = 'none';
     gameContainer.style.display = 'block';
@@ -593,14 +667,64 @@ function startGame() {
     setupPhase(0); 
 }
 
+// 【修改点】根据分数显示全局最高进度
+function displayBestRecord() {
+    let bestScore = parseInt(localStorage.getItem('bestGameScore'));
+    // 兼容旧版存档
+    if (isNaN(bestScore)) {
+        let oldNightmare = parseInt(localStorage.getItem('bestNightmareLevel')) || 0;
+        bestScore = oldNightmare > 0 ? 2 + oldNightmare : 0;
+    }
+    let savedName = localStorage.getItem('playerNickname') || '';
+    
+    let recordText = "Easy";
+    if (bestScore === 1) recordText = "Medium";
+    else if (bestScore === 2) recordText = "Hard";
+    else if (bestScore > 2) recordText = "Nightmare Lv." + (bestScore - 2);
+
+    document.getElementById('best-record-display').innerText = `Best Record: ${recordText}`;
+    if (savedName) {
+        document.getElementById('player-nickname').value = savedName;
+    }
+}
+
+// 【修改点】计算全局最高进度并保存
 function gameOver(customMsg) {
     isProcessing = true;
     clearTimeout(runTimer);
-    if (currentBGM) currentBGM.pause(); // 游戏结束时直接暂停音乐
+    
+    if (currentBGM) currentBGM.pause(); 
+    sfxGameOver.currentTime = 0;
+    sfxGameOver.play().catch(e => console.log("SFX play failed:", e));
+
     gameContainer.style.display = 'none';
     document.getElementById('game-over-screen').style.display = 'flex';
-    if (customMsg) document.getElementById('game-over-msg').innerText = customMsg;
+    
+    let msgEl = document.getElementById('game-over-msg');
+    if (customMsg) msgEl.innerText = customMsg;
+    
     document.getElementById('game-over-review-list').innerHTML = generateReviewHTML(1);
+    
+    // 获取历史最高分
+    let bestScore = parseInt(localStorage.getItem('bestGameScore'));
+    if (isNaN(bestScore)) {
+        let oldNightmare = parseInt(localStorage.getItem('bestNightmareLevel')) || 0;
+        bestScore = oldNightmare > 0 ? 2 + oldNightmare : 0;
+    }
+    
+    // 计算当前分数：0=Easy, 1=Medium, 2=Hard, 3及以上=Nightmare
+    let currentScore = currentPhaseIndex < 3 ? currentPhaseIndex : 2 + nightmareLevel;
+    
+    if (currentScore > bestScore) {
+        localStorage.setItem('bestGameScore', currentScore);
+        
+        let recordText = "Easy";
+        if (currentScore === 1) recordText = "Medium";
+        else if (currentScore === 2) recordText = "Hard";
+        else if (currentScore > 2) recordText = "Nightmare Lv." + (currentScore - 2);
+
+        msgEl.innerHTML += `<br><br><span style="color:var(--pixel-yellow); animation: pulseText 1s infinite;">🏆 NEW RECORD: ${recordText}!</span>`;
+    }
 }
 
 function quitGame() {
@@ -688,13 +812,17 @@ function loadQuestion() {
 
     const phaseKey = currentPhaseIndex >= 3 ? "NIGHTMARE" : phaseNames[currentPhaseIndex];
     const pool     = monsterAssets[phaseKey];
-    const monster  = pool[Math.floor(Math.random() * pool.length)];
-    threat.style.backgroundImage = `url('${monster.src}')`;
-    threat.style.setProperty('--frames', monster.frames);
-    threat.style.setProperty('--sprite-width', monster.width + 'px');
-    threat.style.width  = monster.width + 'px';
-    threat.style.height = (monster.height || 64) + 'px';
-    threat.dataset.flip = monster.flip ? "true" : "false";
+    currentMonster = pool[Math.floor(Math.random() * pool.length)]; 
+    
+    threat.style.filter = 'drop-shadow(-5px 5px 0px rgba(0,0,0,0.8))';
+    threat.style.opacity = '1';
+    
+    threat.style.backgroundImage = `url('${currentMonster.src}')`;
+    threat.style.setProperty('--frames', currentMonster.frames);
+    threat.style.setProperty('--sprite-width', currentMonster.width + 'px');
+    threat.style.width  = currentMonster.width + 'px';
+    threat.style.height = (currentMonster.height || 64) + 'px';
+    threat.dataset.flip = currentMonster.flip ? "true" : "false";
     threat.className    = 'sprite-anim';
 
     player.className = 'sprite-anim state-run';
@@ -818,11 +946,38 @@ function checkAnswer(clickedGate) {
         document.getElementById('hint-btn').style.display = 'none';
         document.getElementById('hint-display').style.display = 'none';
         document.querySelectorAll('.gate').forEach(g => { if (g !== clickedGate) g.style.opacity = '0.3'; });
+        
         player.className = 'sprite-anim state-attack';
         document.getElementById('top-controls').style.display = 'none';
 
+        setTimeout(() => {
+            const wave = document.createElement('div');
+            wave.className = 'light-wave';
+            document.getElementById('runner-area').appendChild(wave);
+
+            setTimeout(() => {
+                threat.style.backgroundImage = `url('${currentMonster.dieSrc}')`;
+                threat.style.setProperty('--frames', currentMonster.dieFrames);
+                threat.style.setProperty('--sprite-width', currentMonster.dieWidth + 'px');
+                threat.style.width = currentMonster.dieWidth + 'px';
+                threat.className = 'sprite-die'; 
+                
+                threat.style.filter = 'brightness(1.5) drop-shadow(0 0 10px #FFD700)';
+                
+                setTimeout(() => {
+                    threat.style.opacity = '0';
+                    threat.style.transition = 'opacity 0.3s ease-out';
+                }, 600);
+            }, 300);
+
+            setTimeout(() => {
+                wave.remove();
+            }, 350);
+        }, 250);
+
         triggerRandomChest();
-        setTimeout(() => showCodex(data, true), 1200);
+        
+        setTimeout(() => showCodex(data, true), 1500);
     } else {
         handleCrash(clickedGate);
     }
@@ -1115,10 +1270,8 @@ function generateReviewHTML(threshold) {
 function checkIntermission() {
     gameContainer.style.display = 'none';
     
-    // 播放篝火休息音乐 (平滑过渡)
     playBGM('campfire');
     
-    // 篝火休息，恢复2点生命值
     hp = Math.min(hp + 2, maxHp);
     updateHpDisplay();
     
@@ -1151,7 +1304,6 @@ function showSummitScreen() {
     const warrior = document.getElementById('summit-warrior');
     const wrapper = document.getElementById('summit-dialogue-wrapper');
 
-    // 播放山顶结算音乐 (平滑过渡)
     playBGM('summit');
 
     summitDialogueIndex = 0;
@@ -1165,7 +1317,6 @@ function showSummitScreen() {
 
     spawnSummitStars();
 
-    // Warrior stands still and breathes
     warrior.className          = 'warrior-breathe';
     warrior.style.transition   = 'none';
     warrior.style.left         = 'calc(50% - 48px)';
