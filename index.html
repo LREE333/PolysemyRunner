@@ -58,9 +58,36 @@
             z-index: 100; gap: 30px; background: #111; text-align: center;
         }
 
+        /* 新增：加载界面样式 */
+        #loading-screen {
+            z-index: 10000;
+            background: #000;
+        }
+        .loading-bar-container {
+            width: 60%;
+            max-width: 400px;
+            height: 24px;
+            border: 4px solid white;
+            background: #222;
+            padding: 2px;
+            box-sizing: border-box;
+        }
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--pixel-green);
+            transition: width 0.1s linear;
+        }
+        .loading-text {
+            color: white;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            animation: pulseText 1.5s infinite;
+        }
+
         #init-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; color: white; display: flex;
+            background: #000; color: white; display: none; /* 初始隐藏，等加载完显示 */
             justify-content: center; align-items: center; z-index: 9999;
             cursor: pointer; font-family: var(--font-main);
             animation: pulseText 2s infinite;
@@ -76,7 +103,6 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            display: block; 
         }
 
         #player-info-container {
@@ -332,6 +358,15 @@
 <body>
 <script src="data.js"></script>
 
+<!-- ── 加载进度条屏幕 (Asset Manager) ── -->
+<div id="loading-screen" class="full-screen-menu">
+    <h2 style="color: var(--pixel-yellow);">ASSET MANAGER</h2>
+    <div class="loading-text" id="loading-text">Loading 资源中... 0%</div>
+    <div class="loading-bar-container">
+        <div id="loading-bar"></div>
+    </div>
+</div>
+
 <!-- ── 音频初始化屏幕 ── -->
 <div id="init-screen" onclick="initGameAudio()">
     <p>Click anywhere to start</p>
@@ -340,7 +375,6 @@
 <!-- ── Start Screen (封面图) ── -->
 <div id="start-screen" class="full-screen-menu">
     <div id="player-info-container">
-        <!-- 【修改点】将 Best Nightmare 改为了 Best Record -->
         <div id="best-record-display">Best Record: Easy</div>
         <input type="text" id="player-nickname" placeholder="Enter Nickname" autocomplete="off" spellcheck="false">
     </div>
@@ -494,6 +528,71 @@
 </div>
 
 <script>
+/* ================================================================
+   ASSET MANAGER (Preloader)
+   ================================================================ */
+const gameAssets = [
+    // Images
+    'assets/cover.png', 'assets/fire_relax.png', 'assets/character/run.png', 
+    'assets/character/attack.png', 'assets/character/hurt.png', 'assets/heart.png', 
+    'assets/easy_image.png', 'assets/medium_image.png', 'assets/hard_image.png', 
+    'assets/nightmare_image.png', 'assets/summit_image.png', 'assets/chloe_portrait.png',
+    'assets/monsters/easy/mushroom_run.png', 'assets/monsters/easy/mushroom_die.png',
+    'assets/monsters/medium/enemy_run.png', 'assets/monsters/medium/enemy_die.png',
+    'assets/monsters/hard/golem_1_run.png', 'assets/monsters/hard/golem_1_die.png',
+    'assets/monsters/hard/golem_2_run.png', 'assets/monsters/hard/golem_2_die.png',
+    'assets/monsters/nightmare/bat-run.png', 'assets/monsters/nightmare/bat-die.png',
+    // Audio
+    'assets/bgm_start.wav', 'assets/bgm_easy.wav', 'assets/bgm_medium.wav', 
+    'assets/bgm_hard.wav', 'assets/bgm_nightmare.wav', 'assets/bgm_campfire.wav', 
+    'assets/bgm_summit.wav', 'assets/bgm_gameover.wav'
+];
+
+let loadedAssetsCount = 0;
+
+function preloadGameAssets() {
+    if (gameAssets.length === 0) {
+        finishLoading();
+        return;
+    }
+
+    gameAssets.forEach(src => {
+        if (src.endsWith('.wav') || src.endsWith('.mp3')) {
+            const audio = new Audio();
+            // 无论成功还是失败都算作处理完成，防止游戏因单个文件丢失而卡死
+            audio.oncanplaythrough = () => handleAssetLoaded();
+            audio.onerror = () => handleAssetLoaded();
+            audio.src = src;
+        } else {
+            const img = new Image();
+            img.onload = () => handleAssetLoaded();
+            img.onerror = () => handleAssetLoaded();
+            img.src = src;
+        }
+    });
+}
+
+function handleAssetLoaded() {
+    loadedAssetsCount++;
+    const percent = Math.floor((loadedAssetsCount / gameAssets.length) * 100);
+    
+    document.getElementById('loading-text').innerText = `Loading 资源中... ${percent}%`;
+    document.getElementById('loading-bar').style.width = `${percent}%`;
+
+    if (loadedAssetsCount === gameAssets.length) {
+        // 延迟一点点时间让玩家看清 100%
+        setTimeout(finishLoading, 400);
+    }
+}
+
+function finishLoading() {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('init-screen').style.display = 'flex';
+}
+
+// 页面加载完毕后开始预加载资源
+window.addEventListener('load', preloadGameAssets);
+
 /* ================================================================
    AUDIO SYSTEM 
    ================================================================ */
@@ -660,17 +759,16 @@ function startGame() {
     document.getElementById('start-screen').style.display = 'none';
     gameContainer.style.display = 'block';
     
-    allQuestions = [...easyPool, ...mediumPool, ...hardPool];
+    // 假设这些数据在 data.js 里定义
+    if(typeof easyPool !== 'undefined') allQuestions = [...easyPool, ...mediumPool, ...hardPool];
     mistakeStats = {};
     updateHpDisplay();
     
     setupPhase(0); 
 }
 
-// 【修改点】根据分数显示全局最高进度
 function displayBestRecord() {
     let bestScore = parseInt(localStorage.getItem('bestGameScore'));
-    // 兼容旧版存档
     if (isNaN(bestScore)) {
         let oldNightmare = parseInt(localStorage.getItem('bestNightmareLevel')) || 0;
         bestScore = oldNightmare > 0 ? 2 + oldNightmare : 0;
@@ -688,7 +786,6 @@ function displayBestRecord() {
     }
 }
 
-// 【修改点】计算全局最高进度并保存
 function gameOver(customMsg) {
     isProcessing = true;
     clearTimeout(runTimer);
@@ -705,14 +802,12 @@ function gameOver(customMsg) {
     
     document.getElementById('game-over-review-list').innerHTML = generateReviewHTML(1);
     
-    // 获取历史最高分
     let bestScore = parseInt(localStorage.getItem('bestGameScore'));
     if (isNaN(bestScore)) {
         let oldNightmare = parseInt(localStorage.getItem('bestNightmareLevel')) || 0;
         bestScore = oldNightmare > 0 ? 2 + oldNightmare : 0;
     }
     
-    // 计算当前分数：0=Easy, 1=Medium, 2=Hard, 3及以上=Nightmare
     let currentScore = currentPhaseIndex < 3 ? currentPhaseIndex : 2 + nightmareLevel;
     
     if (currentScore > bestScore) {
@@ -738,6 +833,7 @@ function quitGame() {
    ================================================================ */
 function setupPhase(index) {
     currentPhaseIndex = index;
+    if(typeof easyPool === 'undefined') return; // 容错，防止没有 data.js 报错
     if      (index === 0) activePool = shuffleArray([...easyPool]);
     else if (index === 1) activePool = shuffleArray([...mediumPool]);
     else if (index === 2) activePool = shuffleArray([...hardPool]);
